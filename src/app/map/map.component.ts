@@ -5,13 +5,11 @@ import * as L from 'leaflet';
   selector: 'app-map',
   standalone: false,
   templateUrl: './map.component.html',
-  styleUrl: './map.component.scss',
+  styleUrls: ['./map.component.scss'],
 })
 export class MapComponent implements OnInit, AfterViewInit {
   private map!: L.Map;
-  markers: L.Marker[] = [
-    L.marker([23.7771, 90.3994]), // Dhaka, Bangladesh
-  ];
+  markers: L.Marker[] = [L.marker([32.7767, -96.797])];
 
   constructor() {}
 
@@ -19,22 +17,23 @@ export class MapComponent implements OnInit, AfterViewInit {
 
   ngAfterViewInit() {
     this.initMap();
-    this.centerMap();
   }
 
   private initMap() {
-    const baseMapURl = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
-    this.map = L.map('map');
-    L.tileLayer(baseMapURl).addTo(this.map);
-  }
+    this.map = L.map('map', {
+      zoomSnap: 0.5, // Ensures smooth zoom adjustment
+    });
 
-  private centerMap() {
-    // Create a boundary based on the markers
-    const bounds = L.latLngBounds(
-      this.markers.map((marker) => marker.getLatLng())
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(
+      this.map
     );
 
-    // Fit the map into the boundary
-    this.map.fitBounds(bounds);
+    // Define DFW Metroplex bounding box with a slightly zoomed-in view
+    const dfwBounds: L.LatLngBoundsExpression = [
+      [32.6, -97.3], // Adjusted Southwest corner
+      [33.2, -96.7], // Adjusted Northeast corner
+    ];
+
+    this.map.fitBounds(dfwBounds); // Fit map to show a zoomed-in DFW area
   }
 }

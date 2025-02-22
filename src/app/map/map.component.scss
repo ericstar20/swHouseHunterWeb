@@ -1,0 +1,40 @@
+.map-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh; // Full viewport height
+  width: 100%;
+
+  .search-bar {
+    padding: 10px;
+    display: flex;
+    justify-content: center;
+    background-color: #f8f9fa;
+    border-bottom: 2px solid #ddd;
+  }
+
+  input {
+    padding: 8px;
+    margin-right: 10px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+  }
+
+  button {
+    padding: 8px 12px;
+    border: none;
+    background-color: #007bff;
+    color: white;
+    cursor: pointer;
+    border-radius: 5px;
+
+    &:hover {
+      background-color: #0056b3;
+    }
+  }
+
+  #map {
+    flex-grow: 1; // Allows the map to expand fully
+    height: 100%;
+    width: 100%;
+  }
+}
