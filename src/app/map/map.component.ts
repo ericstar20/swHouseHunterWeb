@@ -120,7 +120,6 @@ export class MapComponent implements OnInit, AfterViewInit {
     // **Clear previous content**
     this.popupDiv.innerHTML = `
       <div style="display: flex; justify-content: space-between; align-items: center;">
-        <strong>ZIP: ${zip}</strong>
         <button id="close-popup" style="
           background: red;
           color: white;
@@ -167,13 +166,46 @@ export class MapComponent implements OnInit, AfterViewInit {
       options: {
         responsive: false,
         maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            labels: {
+              font: {
+                size: 14, // ✅ Make the legend (ZIP Code Label) more readable
+                weight: 'bold',
+              },
+              color: '#333', // ✅ Improve contrast
+            },
+          },
+          title: {
+            display: true,
+            text: `ZIP: ${zip}`, // ✅ Show ZIP as chart title
+            font: {
+              size: 16,
+              weight: 'bold',
+            },
+            color: '#000',
+            padding: {
+              top: 10,
+              bottom: 10,
+            },
+          },
+        },
         scales: {
-          y: {
-            beginAtZero: true,
-            suggestedMin: Math.max(0, Math.min(...incomeValues) - 5000),
-            suggestedMax: Math.max(...incomeValues) + 1000,
+          x: {
             ticks: {
-              callback: (value) => `$${value.toLocaleString()}`,
+              font: {
+                size: 12, // ✅ Improve X-axis label readability
+              },
+              color: '#555',
+            },
+          },
+          y: {
+            ticks: {
+              font: {
+                size: 12, // ✅ Improve Y-axis readability
+              },
+              color: '#555',
+              callback: (value) => `$${value.toLocaleString()}`, // ✅ Format as currency
             },
           },
         },
