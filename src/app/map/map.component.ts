@@ -1,6 +1,7 @@
 import { Component, OnInit, AfterViewInit } from '@angular/core';
 import { ZipGeoCodeService } from '../services/zip-geo-code.service';
 import * as L from 'leaflet';
+import { Chart } from 'chart.js/auto';
 
 @Component({
   selector: 'app-map',
@@ -11,6 +12,9 @@ import * as L from 'leaflet';
 export class MapComponent implements OnInit, AfterViewInit {
   private map!: L.Map;
   markers: L.Marker[] = [L.marker([32.7767, -96.797])];
+  private zipBoundaryLayer = L.layerGroup();
+  private incomeChart!: Chart;
+  private popupDiv!: HTMLDivElement;
 
   constructor(private zipGeoCodeService: ZipGeoCodeService) {}
 
@@ -37,6 +41,18 @@ export class MapComponent implements OnInit, AfterViewInit {
     ];
 
     this.map.fitBounds(dfwBounds); // Fit map to show a zoomed-in DFW area
+    this.zipBoundaryLayer.addTo(this.map);
+
+    // create a floating div for the popup chart
+    this.popupDiv = document.createElement('div');
+    this.popupDiv.id = 'income-chart-popup';
+    this.popupDiv.style.position = 'absolute';
+    this.popupDiv.style.background = 'white';
+    this.popupDiv.style.padding = '10px';
+    this.popupDiv.style.borderRadius = '5px';
+    this.popupDiv.style.boxShadow = '0px 4px 6px rgba(0, 0, 0, 0.1)';
+    this.popupDiv.style.display = 'none';
+    document.body.appendChild(this.popupDiv);
   }
 
   // Fetch and display ZIP boundaries for a state
@@ -56,16 +72,134 @@ export class MapComponent implements OnInit, AfterViewInit {
           `✅ Received ${response.features.length} ZIP boundaries for state:`,
           state
         );
+        this.zipBoundaryLayer.clearLayers();
 
         // Add new ZIP boundaries
         response.features.forEach((zipData: any) => {
           const zipLayer = L.geoJSON(zipData.geometry, {
             style: { color: '#6f42c1', weight: 1.5 },
-          }).bindPopup(`ZIP: ${zipData.properties.zip}`);
+          });
+
+          zipLayer
+            .bindPopup(`ZIP: ${zipData.properties.zip}`)
+            .on('click', (e: any) => this.onZipClick(e, zipData.properties));
+
           zipLayer.addTo(this.map);
         });
       },
       (error) => console.error('❌ Error fetching ZIP boundaries:', error)
     );
+  }
+
+  private onZipClick(event: any, properties: any) {
+    const zip = properties.zip;
+    console.log(`📍 ZIP Code Clicked: ${zip}`);
+
+    this.zipGeoCodeService.getMedianIncomeByZipcode(zip).subscribe(
+      (incomeData) => {
+        console.log(`📊 Median Income Data for ZIP ${zip}:`, incomeData);
+        this.showIncomeChart(event, zip, incomeData);
+      },
+      (error) =>
+        console.error(`❌ Error fetching income data for ZIP ${zip}:`, error)
+    );
+  }
+
+  private showIncomeChart(event: any, zip: string, incomeData: any[]) {
+    if (!incomeData || incomeData.length === 0) {
+      console.warn(`❌ No median income data available for ZIP: ${zip}`);
+      return;
+    }
+    incomeData.sort((a, b) => a.year - b.year);
+
+    const years = incomeData.map((entry) => entry.year);
+    const incomeValues = incomeData.map(
+      (entry) => entry.data.totalHouseholdMedianIncome ?? 0
+    );
+
+    // **Clear previous content**
+    this.popupDiv.innerHTML = `
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <strong>ZIP: ${zip}</strong>
+        <button id="close-popup" style="
+          background: red;
+          color: white;
+          border: none;
+          padding: 2px 8px;
+          cursor: pointer;
+          border-radius: 3px;
+          font-size: 14px;
+        ">X</button>
+      </div>
+    `;
+
+    // **Create Chart Canvas**
+    const canvas = document.createElement('canvas');
+    canvas.id = 'income-chart';
+    canvas.style.width = '300px';
+    canvas.style.height = '200px';
+    this.popupDiv.appendChild(canvas);
+
+    // **Fix Popup Size**
+    this.popupDiv.style.width = '320px';
+    this.popupDiv.style.height = '250px';
+
+    // **Destroy Previous Chart**
+    if (this.incomeChart) {
+      this.incomeChart.destroy();
+    }
+
+    // **Create Chart**
+    this.incomeChart = new Chart(canvas, {
+      type: 'line',
+      data: {
+        labels: years,
+        datasets: [
+          {
+            label: 'Median Income',
+            data: incomeValues,
+            borderColor: '#007bff',
+            backgroundColor: 'rgba(0, 123, 255, 0.2)',
+            fill: true,
+          },
+        ],
+      },
+      options: {
+        responsive: false,
+        maintainAspectRatio: false,
+        scales: {
+          y: {
+            beginAtZero: true,
+            suggestedMin: Math.max(0, Math.min(...incomeValues) - 5000),
+            suggestedMax: Math.max(...incomeValues) + 1000,
+            ticks: {
+              callback: (value) => `$${value.toLocaleString()}`,
+            },
+          },
+        },
+      },
+    });
+
+    // **Position the Popup**
+    const { x, y } = this.map.latLngToContainerPoint(event.latlng);
+    this.popupDiv.style.left = `${x + 10}px`;
+    this.popupDiv.style.top = `${y - 50}px`;
+    this.popupDiv.style.display = 'block';
+    this.popupDiv.style.zIndex = '1000';
+
+    console.log(
+      '📌 Popup should be visible at:',
+      this.popupDiv.style.left,
+      this.popupDiv.style.top
+    );
+
+    // **Add Event Listener for Close Button**
+    document.getElementById('close-popup')?.addEventListener('click', () => {
+      this.hideIncomeChart();
+    });
+  }
+
+  private hideIncomeChart() {
+    this.popupDiv.style.display = 'none';
   }
 }
