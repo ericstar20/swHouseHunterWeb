@@ -2,6 +2,17 @@ import { Component, OnInit, AfterViewInit } from '@angular/core';
 import { ZipGeoCodeService } from '../../core/services/zip-geo-code.service';
 import * as L from 'leaflet';
 import { Chart } from 'chart.js/auto';
+import {
+  showChartPopup,
+  ChartDataConfig,
+} from '../../shared/utils/chart.utils';
+
+interface MedianIncomeData {
+  year: number;
+  data: {
+    totalHouseholdMedianIncome: number;
+  };
+}
 
 @Component({
   selector: 'app-map',
@@ -96,142 +107,43 @@ export class MapComponent implements OnInit, AfterViewInit {
     console.log(`📍 ZIP Code Clicked: ${zip}`);
 
     this.zipGeoCodeService.getMedianIncomeByZipcode(zip).subscribe(
-      (incomeData) => {
+      (incomeData: MedianIncomeData[]) => {
         console.log(`📊 Median Income Data for ZIP ${zip}:`, incomeData);
-        this.showIncomeChart(event, zip, incomeData);
+
+        if (!incomeData || incomeData.length === 0) {
+          console.warn(`❌ No median income data available for ZIP: ${zip}`);
+          return;
+        }
+
+        // **Sort data chronologically**
+        incomeData.sort(
+          (a: MedianIncomeData, b: MedianIncomeData) => a.year - b.year
+        );
+
+        const years = incomeData.map((entry) => entry.year.toString());
+        const incomeValues = incomeData.map(
+          (entry) => entry.data.totalHouseholdMedianIncome ?? 0
+        );
+
+        // ✅ Use shared function for chart display
+        const chartConfig: ChartDataConfig = {
+          title: `Median Income - ZIP ${zip}`,
+          labels: years,
+          datasets: [
+            {
+              label: 'Median Income',
+              data: incomeValues,
+              borderColor: '#007bff',
+              backgroundColor: 'rgba(0, 123, 255, 0.2)',
+            },
+          ],
+          position: this.map.latLngToContainerPoint(event.latlng),
+        };
+
+        showChartPopup(chartConfig);
       },
       (error) =>
         console.error(`❌ Error fetching income data for ZIP ${zip}:`, error)
     );
-  }
-
-  private showIncomeChart(event: any, zip: string, incomeData: any[]) {
-    if (!incomeData || incomeData.length === 0) {
-      console.warn(`❌ No median income data available for ZIP: ${zip}`);
-      return;
-    }
-    incomeData.sort((a, b) => a.year - b.year);
-
-    const years = incomeData.map((entry) => entry.year);
-    const incomeValues = incomeData.map(
-      (entry) => entry.data.totalHouseholdMedianIncome ?? 0
-    );
-
-    // **Clear previous content**
-    this.popupDiv.innerHTML = `
-      <div style="display: flex; justify-content: space-between; align-items: center;">
-        <button id="close-popup" style="
-          background: red;
-          color: white;
-          border: none;
-          padding: 2px 8px;
-          cursor: pointer;
-          border-radius: 3px;
-          font-size: 14px;
-        ">X</button>
-      </div>
-    `;
-
-    // **Create Chart Canvas**
-    const canvas = document.createElement('canvas');
-    canvas.id = 'income-chart';
-    canvas.style.width = '300px';
-    canvas.style.height = '200px';
-    this.popupDiv.appendChild(canvas);
-
-    // **Fix Popup Size**
-    this.popupDiv.style.width = '320px';
-    this.popupDiv.style.height = '250px';
-
-    // **Destroy Previous Chart**
-    if (this.incomeChart) {
-      this.incomeChart.destroy();
-    }
-
-    // **Create Chart**
-    this.incomeChart = new Chart(canvas, {
-      type: 'line',
-      data: {
-        labels: years,
-        datasets: [
-          {
-            label: 'Median Income',
-            data: incomeValues,
-            borderColor: '#007bff',
-            backgroundColor: 'rgba(0, 123, 255, 0.2)',
-            fill: true,
-          },
-        ],
-      },
-      options: {
-        responsive: false,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: {
-            labels: {
-              font: {
-                size: 14, // ✅ Make the legend (ZIP Code Label) more readable
-                weight: 'bold',
-              },
-              color: '#333', // ✅ Improve contrast
-            },
-          },
-          title: {
-            display: true,
-            text: `ZIP: ${zip}`, // ✅ Show ZIP as chart title
-            font: {
-              size: 16,
-              weight: 'bold',
-            },
-            color: '#000',
-            padding: {
-              top: 10,
-              bottom: 10,
-            },
-          },
-        },
-        scales: {
-          x: {
-            ticks: {
-              font: {
-                size: 12, // ✅ Improve X-axis label readability
-              },
-              color: '#555',
-            },
-          },
-          y: {
-            ticks: {
-              font: {
-                size: 12, // ✅ Improve Y-axis readability
-              },
-              color: '#555',
-              callback: (value) => `$${value.toLocaleString()}`, // ✅ Format as currency
-            },
-          },
-        },
-      },
-    });
-
-    // **Position the Popup**
-    const { x, y } = this.map.latLngToContainerPoint(event.latlng);
-    this.popupDiv.style.left = `${x + 10}px`;
-    this.popupDiv.style.top = `${y - 50}px`;
-    this.popupDiv.style.display = 'block';
-    this.popupDiv.style.zIndex = '1000';
-
-    console.log(
-      '📌 Popup should be visible at:',
-      this.popupDiv.style.left,
-      this.popupDiv.style.top
-    );
-
-    // **Add Event Listener for Close Button**
-    document.getElementById('close-popup')?.addEventListener('click', () => {
-      this.hideIncomeChart();
-    });
-  }
-
-  private hideIncomeChart() {
-    this.popupDiv.style.display = 'none';
   }
 }
