@@ -1,5 +1,5 @@
 import { Component, OnInit, AfterViewInit } from '@angular/core';
-import { ZipGeoCodeService } from '../services/zip-geo-code.service';
+import { ZipGeoCodeService } from '../../core/services/zip-geo-code.service';
 import * as L from 'leaflet';
 import { Chart } from 'chart.js/auto';
 
