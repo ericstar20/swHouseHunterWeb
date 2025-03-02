@@ -1,18 +1,5 @@
 import { Chart } from 'chart.js/auto';
-
-// **Interface for Chart Data Input**
-export interface ChartDataConfig {
-  title: string; // Title of the chart (e.g., ZIP Code, Category Name)
-  datasets: {
-    label: string;
-    data: number[];
-    borderColor: string;
-    backgroundColor?: string;
-  }[];
-  labels: string[]; // X-Axis Labels (Years)
-  position: { x: number; y: number }; // Popup position
-  containerId?: string; // Optional: Define a container for flexibility
-}
+import { ChartDataConfig } from '../models/chart-data.model';
 
 // **Shared Chart Function**
 export function showChartPopup(chartConfig: ChartDataConfig) {

@@ -2,18 +2,9 @@ import { Component, OnInit, AfterViewInit } from '@angular/core';
 import { ZipGeoCodeService } from '../../core/services/zip-geo-code.service';
 import * as L from 'leaflet';
 import { Chart } from 'chart.js/auto';
-import {
-  showChartPopup,
-  ChartDataConfig,
-} from '../../shared/utils/chart.utils';
-
-interface MedianIncomeData {
-  year: number;
-  data: {
-    totalHouseholdMedianIncome: number;
-  };
-}
-
+import { showChartPopup } from '../../shared/utils/chart.utils';
+import { MedianIncomeData } from '../../shared/models/median-income.model';
+import { ChartDataConfig } from '../../shared/models/chart-data.model';
 @Component({
   selector: 'app-map',
   standalone: false,
