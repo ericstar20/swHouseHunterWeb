@@ -79,7 +79,11 @@ export class MapComponent implements OnInit, AfterViewInit {
         // Add new ZIP boundaries
         response.features.forEach((zipData: any) => {
           const zipLayer = L.geoJSON(zipData.geometry, {
-            style: { color: '#6f42c1', weight: 1.5 },
+            style: {
+              color: '#6f42c1',
+              weight: 1.5,
+              fillOpacity: 0,
+            },
           });
 
           zipLayer
