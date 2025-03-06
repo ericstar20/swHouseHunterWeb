@@ -119,15 +119,19 @@ export class MapComponent implements OnInit, AfterViewInit {
         const incomeValues = incomeData.map(
           (entry) => entry.data.totalHouseholdMedianIncome ?? 0
         );
+        const latestIncome =
+          incomeData[incomeData.length - 1]?.data?.totalHouseholdMedianIncome ??
+          null;
+        const zipRanking = this.getZipRanking(latestIncome);
 
         // ✅ Use shared function for chart display
         const chartConfig: ChartDataConfig = {
-          title: `Median Income - ZIP ${zip}`,
+          title: `Median Income - ZIP ${zip} (${zipRanking})`,
           labels: years,
           datasets: [
             {
               label: 'Median Income',
-              data: incomeValues,
+              data: incomeValues.map((val) => (val === null ? 0 : val)), // Prevents null from breaking the chart
               borderColor: '#007bff',
               backgroundColor: 'rgba(0, 123, 255, 0.2)',
             },
@@ -140,5 +144,14 @@ export class MapComponent implements OnInit, AfterViewInit {
       (error) =>
         console.error(`❌ Error fetching income data for ZIP ${zip}:`, error)
     );
+  }
+
+  private getZipRanking(medianIncome: number | null): string {
+    if (medianIncome === null || medianIncome === undefined) return 'Unknown';
+    if (medianIncome >= 120000) return 'S';
+    if (medianIncome >= 90000) return 'A';
+    if (medianIncome >= 60000) return 'B';
+    if (medianIncome >= 30000) return 'C';
+    return 'D';
   }
 }
