@@ -18,7 +18,7 @@ export class ZipGeoCodeService {
 
   // Fetch Median Income Data for a Zip code over the last 5 years
   getMedianIncomeByZipcode(zip: string): Observable<any> {
-    const currentYear = new Date().getFullYear();
+    const currentYear = 2023; //new Date().getFullYear();
     const maxYears = 3; //stop fetching after collecting 3 years of data
     return this.fetchMedianIncome(zip, currentYear, [], maxYears);
   }
