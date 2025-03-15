@@ -1,3 +1,15 @@
+<div class="search-container">
+    <label for="zip-rank">Filter by Rank:</label>
+    <select id="zip-rank" (change)="filterZipByRanking($event)">
+        <option value="">All</option>
+        <option value="S">S - Elite</option>
+        <option value="A">A - High</option>
+        <option value="B">B - Medium</option>
+        <option value="C">C - Low</option>
+        <option value="D">D - Very Low</option>
+    </select>
+</div>
+
 <div class="map-container">
     <div id="map"></div>
 </div>
