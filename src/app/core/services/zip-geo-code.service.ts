@@ -16,6 +16,11 @@ export class ZipGeoCodeService {
     return this.http.get(`${this.geoCodeApiUrl}/${state}`);
   }
 
+  // Fetch all median income from db
+  getAllMedianIncome(): Observable<any> {
+    return this.http.get(`${this.incomeApiUrl}`);
+  }
+
   // Fetch Median Income Data for a Zip code over the last 5 years
   getMedianIncomeByZipcode(zip: string): Observable<any> {
     const currentYear = 2023; //new Date().getFullYear();
@@ -31,7 +36,7 @@ export class ZipGeoCodeService {
     minYear: number = new Date().getFullYear() - 6 //
   ): Observable<any[]> {
     if (collectionData.length >= maxYears || year < minYear) {
-      console.warn(`🔚 Stopping fetch for ZIP ${zip}. Reached 10 years back.`);
+      console.warn(`🔚 Stopping fetch for ZIP ${zip}. Reached 6 years back.`);
       return of(collectionData);
     }
 
