@@ -15,7 +15,6 @@ export class MapComponent implements OnInit, AfterViewInit {
   private map!: L.Map;
   markers: L.Marker[] = [L.marker([32.7767, -96.797])];
   private zipBoundaryLayer = L.layerGroup();
-  private incomeChart!: Chart;
   private popupDiv!: HTMLDivElement;
   private zipLayers: { layer: L.Layer; rank: string }[] = []; // Store all layers with their ranks
   private incomeDataCache: { [zip: string]: number } = {};
