@@ -15,16 +15,19 @@ export class MapComponent implements OnInit, AfterViewInit {
   private map!: L.Map;
   markers: L.Marker[] = [L.marker([32.7767, -96.797])];
   private zipBoundaryLayer = L.layerGroup();
-  private incomeChart!: Chart;
   private popupDiv!: HTMLDivElement;
+  private zipLayers: { layer: L.Layer; rank: string }[] = []; // Store all layers with their ranks
+  private incomeDataCache: { [zip: string]: number } = {};
 
   constructor(private zipGeoCodeService: ZipGeoCodeService) {}
 
-  ngOnInit() {}
+  ngOnInit() {
+    this.loadBatchMedianIncome();
+    this.loadZipBoundariesForState('TX'); // Adjust for your state
+  }
 
   ngAfterViewInit() {
     this.initMap();
-    this.loadZipBoundariesForState('TX'); // Load ZIP codes for Texas
   }
 
   private initMap() {
@@ -57,6 +60,20 @@ export class MapComponent implements OnInit, AfterViewInit {
     document.body.appendChild(this.popupDiv);
   }
 
+  private loadBatchMedianIncome() {
+    this.zipGeoCodeService.getAllMedianIncome().subscribe(
+      (resp) => {
+        console.log('✅ Batch median income data loaded:', resp);
+        resp.forEach((data: any) => {
+          this.incomeDataCache[data.zipCode] = data.totalHouseholdMedianIncome;
+        });
+      },
+      (error) => {
+        console.error('❌ Error loading batch median income:', error);
+      }
+    );
+  }
+
   // Fetch and display ZIP boundaries for a state
   private loadZipBoundariesForState(state: string) {
     this.zipGeoCodeService.getZipCodesByState(state).subscribe(
@@ -78,19 +95,35 @@ export class MapComponent implements OnInit, AfterViewInit {
 
         // Add new ZIP boundaries
         response.features.forEach((zipData: any) => {
+          const zip = zipData.properties.zip;
+          let latestIncome = this.incomeDataCache[zip];
+
+          if (latestIncome === undefined || latestIncome === null) {
+            console.warn(`⚠️ No income data found for ZIP: ${zip}`);
+          }
+
+          console.log(`${zip} data: ${latestIncome}`);
+
+          const zipRanking = this.getZipRanking(latestIncome);
+          const fillColor = this.getZipRankingColor(zipRanking);
+
           const zipLayer = L.geoJSON(zipData.geometry, {
             style: {
               color: '#6f42c1',
               weight: 1.5,
-              fillOpacity: 0,
+              fillColor: fillColor,
+              fillOpacity: 0.6,
             },
           });
 
           zipLayer
-            .bindPopup(`ZIP: ${zipData.properties.zip}`)
+            .bindPopup(`ZIP: ${zip} - Rank: ${zipRanking}`)
             .on('click', (e: any) => this.onZipClick(e, zipData.properties));
 
-          zipLayer.addTo(this.map);
+          zipLayer.addTo(this.zipBoundaryLayer);
+
+          // Store in a variable for filtering
+          this.zipLayers.push({ layer: zipLayer, rank: zipRanking });
         });
       },
       (error) => console.error('❌ Error fetching ZIP boundaries:', error)
@@ -153,5 +186,34 @@ export class MapComponent implements OnInit, AfterViewInit {
     if (medianIncome >= 60000) return 'B';
     if (medianIncome >= 30000) return 'C';
     return 'D';
+  }
+
+  private getZipRankingColor(ranking: string): string {
+    switch (ranking) {
+      case 'S':
+        return '#00441b'; // Dark Green
+      case 'A':
+        return '#238b45'; // Green
+      case 'B':
+        return '#66c2a4'; // Light Green
+      case 'C':
+        return '#feb24c'; // Orange
+      case 'D':
+        return '#e31a1c'; // Red
+      default:
+        return '#808080'; // Gray for unknown
+    }
+  }
+
+  filterZipByRanking(event: any) {
+    const selectedRank = event.target.value;
+
+    this.zipBoundaryLayer.clearLayers(); // Clear all layers
+
+    this.zipLayers.forEach(({ layer, rank }) => {
+      if (selectedRank === '' || rank === selectedRank) {
+        this.zipBoundaryLayer.addLayer(layer); // Add only the selected rank layers
+      }
+    });
   }
 }
