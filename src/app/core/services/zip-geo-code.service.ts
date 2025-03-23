@@ -8,20 +8,21 @@ import { catchError, Observable, switchMap, of } from 'rxjs';
 export class ZipGeoCodeService {
   private geoCodeApiUrl = 'http://localhost:8080/geo-zipcode';
   private incomeApiUrl = 'http://localhost:8080/median-income';
+  private crimeApiUrl = 'http://localhost:8080/crime';
 
   constructor(private http: HttpClient) {}
 
-  // Fetch all ZIP geo codes for a given state
+  //#region zipCode
   getZipCodesByState(state: string): Observable<any> {
     return this.http.get(`${this.geoCodeApiUrl}/${state}`);
   }
+  //#endregion
 
-  // Fetch all median income from db
+  //#region medianIncome
   getAllMedianIncome(): Observable<any> {
     return this.http.get(`${this.incomeApiUrl}`);
   }
 
-  // Fetch Median Income Data for a Zip code over the last 5 years
   getMedianIncomeByZipcode(zip: string): Observable<any> {
     const currentYear = 2023; //new Date().getFullYear();
     const maxYears = 3; //stop fetching after collecting 3 years of data
@@ -66,4 +67,11 @@ export class ZipGeoCodeService {
       })
     );
   }
+  //#endregion
+
+  //#region crimeData
+  getAllCrimeData(): Observable<any> {
+    return this.http.get(`${this.crimeApiUrl}`);
+  }
+  //#endregion
 }
