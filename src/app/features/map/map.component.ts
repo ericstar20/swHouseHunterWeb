@@ -212,11 +212,11 @@ export class MapComponent implements OnInit, AfterViewInit {
       crimeScore = crimeGradeToScore[grade] ?? 0;
     }
 
-    const weightedScore = medianIncome / 10000 + crimeScore * 5;
+    const weightedScore = medianIncome / 10000 + crimeScore;
 
-    return weightedScore > 25
+    return weightedScore > 20
       ? 'S'
-      : weightedScore > 15
+      : weightedScore > 10
       ? 'A'
       : weightedScore > 5
       ? 'B'
