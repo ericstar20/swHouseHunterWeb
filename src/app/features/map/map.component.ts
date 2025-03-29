@@ -1,10 +1,10 @@
 import { Component, OnInit, AfterViewInit } from '@angular/core';
 import { ZipGeoCodeService } from '../../core/services/zip-geo-code.service';
-import * as L from 'leaflet';
-import { Chart } from 'chart.js/auto';
 import { showChartPopup } from '../../shared/utils/chart.utils';
 import { MedianIncomeData } from '../../shared/models/median-income.model';
 import { ChartDataConfig } from '../../shared/models/chart-data.model';
+import * as L from 'leaflet';
+
 @Component({
   selector: 'app-map',
   standalone: false,
@@ -13,17 +13,18 @@ import { ChartDataConfig } from '../../shared/models/chart-data.model';
 })
 export class MapComponent implements OnInit, AfterViewInit {
   private map!: L.Map;
-  markers: L.Marker[] = [L.marker([32.7767, -96.797])];
   private zipBoundaryLayer = L.layerGroup();
   private popupDiv!: HTMLDivElement;
-  private zipLayers: { layer: L.Layer; rank: string }[] = []; // Store all layers with their ranks
+  private zipLayers: { layer: L.Layer; rank: string }[] = [];
   private incomeDataCache: { [zip: string]: number } = {};
+  private crimeDataCache: { [zip: string]: any } = {};
 
   constructor(private zipGeoCodeService: ZipGeoCodeService) {}
 
   ngOnInit() {
     this.loadBatchMedianIncome();
-    this.loadZipBoundariesForState('TX'); // Adjust for your state
+    this.loadBatchCrimeData();
+    this.loadZipBoundariesForState('TX');
   }
 
   ngAfterViewInit() {
@@ -31,98 +32,72 @@ export class MapComponent implements OnInit, AfterViewInit {
   }
 
   private initMap() {
-    this.map = L.map('map', {
-      zoomSnap: 1, // Ensures smooth zoom adjustment
-    });
-
+    this.map = L.map('map', { zoomSnap: 1 });
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(
       this.map
     );
-
-    // Define DFW Metroplex bounding box with a slightly zoomed-in view
-    const dfwBounds: L.LatLngBoundsExpression = [
-      [32.6, -97.3], // Adjusted Southwest corner
-      [33.2, -96.7], // Adjusted Northeast corner
-    ];
-
-    this.map.fitBounds(dfwBounds); // Fit map to show a zoomed-in DFW area
+    this.map.fitBounds([
+      [32.6, -97.3],
+      [33.2, -96.7],
+    ]);
     this.zipBoundaryLayer.addTo(this.map);
 
-    // create a floating div for the popup chart
     this.popupDiv = document.createElement('div');
-    this.popupDiv.id = 'income-chart-popup';
-    this.popupDiv.style.position = 'absolute';
-    this.popupDiv.style.background = 'white';
-    this.popupDiv.style.padding = '10px';
-    this.popupDiv.style.borderRadius = '5px';
-    this.popupDiv.style.boxShadow = '0px 4px 6px rgba(0, 0, 0, 0.1)';
-    this.popupDiv.style.display = 'none';
+    Object.assign(this.popupDiv.style, {
+      position: 'absolute',
+      background: 'white',
+      padding: '10px',
+      borderRadius: '5px',
+      boxShadow: '0px 4px 6px rgba(0, 0, 0, 0.1)',
+      display: 'none',
+    });
     document.body.appendChild(this.popupDiv);
   }
 
   private loadBatchMedianIncome() {
     this.zipGeoCodeService.getAllMedianIncome().subscribe(
-      (resp) => {
-        console.log('✅ Batch median income data loaded:', resp);
-        resp.forEach((data: any) => {
-          this.incomeDataCache[data.zipCode] = data.totalHouseholdMedianIncome;
-        });
-      },
-      (error) => {
-        console.error('❌ Error loading batch median income:', error);
-      }
+      (resp) =>
+        resp.forEach(
+          (data: any) =>
+            (this.incomeDataCache[data.zipCode] =
+              data.totalHouseholdMedianIncome)
+        ),
+      (error) => console.error('❌ Error loading batch median income:', error)
     );
   }
 
-  // Fetch and display ZIP boundaries for a state
+  private loadBatchCrimeData() {
+    this.zipGeoCodeService
+      .getAllCrimeData()
+      .subscribe((resp) =>
+        resp.forEach((data: any) => (this.crimeDataCache[data.zipCode] = data))
+      );
+  }
+
   private loadZipBoundariesForState(state: string) {
     this.zipGeoCodeService.getZipCodesByState(state).subscribe(
       (response) => {
-        // ✅ Log the raw API response
-        console.log('🔥 API Response:', response);
+        if (!response?.features?.length) return;
 
-        if (!response || !response.features || response.features.length === 0) {
-          console.warn('❌ No ZIP boundaries found for state:', state);
-          return;
-        }
-
-        // ✅ Log the number of ZIP codes received
-        console.log(
-          `✅ Received ${response.features.length} ZIP boundaries for state:`,
-          state
-        );
         this.zipBoundaryLayer.clearLayers();
-
-        // Add new ZIP boundaries
         response.features.forEach((zipData: any) => {
           const zip = zipData.properties.zip;
-          let latestIncome = this.incomeDataCache[zip];
-
-          if (latestIncome === undefined || latestIncome === null) {
-            console.warn(`⚠️ No income data found for ZIP: ${zip}`);
-          }
-
-          console.log(`${zip} data: ${latestIncome}`);
-
-          const zipRanking = this.getZipRanking(latestIncome);
+          const latestIncome = this.incomeDataCache[zip] ?? null;
+          const zipRanking = this.getZipRanking(latestIncome, zip);
           const fillColor = this.getZipRankingColor(zipRanking);
 
           const zipLayer = L.geoJSON(zipData.geometry, {
             style: {
               color: '#6f42c1',
               weight: 1.5,
-              fillColor: fillColor,
+              fillColor,
               fillOpacity: 0.6,
             },
-          });
-
-          zipLayer
+          })
             .bindPopup(`ZIP: ${zip} - Rank: ${zipRanking}`)
             .on('click', (e: any) => this.onZipClick(e, zipData.properties));
 
           zipLayer.addTo(this.zipBoundaryLayer);
-
-          // Store in a variable for filtering
           this.zipLayers.push({ layer: zipLayer, rank: zipRanking });
         });
       },
@@ -132,22 +107,12 @@ export class MapComponent implements OnInit, AfterViewInit {
 
   private onZipClick(event: any, properties: any) {
     const zip = properties.zip;
-    console.log(`📍 ZIP Code Clicked: ${zip}`);
 
     this.zipGeoCodeService.getMedianIncomeByZipcode(zip).subscribe(
       (incomeData: MedianIncomeData[]) => {
-        console.log(`📊 Median Income Data for ZIP ${zip}:`, incomeData);
+        if (!incomeData?.length) return;
 
-        if (!incomeData || incomeData.length === 0) {
-          console.warn(`❌ No median income data available for ZIP: ${zip}`);
-          return;
-        }
-
-        // **Sort data chronologically**
-        incomeData.sort(
-          (a: MedianIncomeData, b: MedianIncomeData) => a.year - b.year
-        );
-
+        incomeData.sort((a, b) => a.year - b.year);
         const years = incomeData.map((entry) => entry.year.toString());
         const incomeValues = incomeData.map(
           (entry) => entry.data.totalHouseholdMedianIncome ?? 0
@@ -155,21 +120,61 @@ export class MapComponent implements OnInit, AfterViewInit {
         const latestIncome =
           incomeData[incomeData.length - 1]?.data?.totalHouseholdMedianIncome ??
           null;
-        const zipRanking = this.getZipRanking(latestIncome);
+        const zipRanking = this.getZipRanking(latestIncome, zip);
+        const crimeData = this.crimeDataCache[zip] || null;
 
-        // ✅ Use shared function for chart display
+        const crimeInfoHTML = crimeData
+          ? `
+          <div style="
+            margin-top: 12px;
+            padding: 10px;
+            background: #f9f9f9;
+            border-radius: 6px;
+            border-left: 4px solid ${this.getCrimeGradeColor(
+              crimeData.overallCrimeGrade
+            )};
+            font-family: Arial, sans-serif;
+            font-size: 14px;
+          ">
+            <h5 style="margin: 0 0 8px; font-size: 16px; font-weight: bold; color: #333;">
+              Crime Data
+            </h5>
+            <p style="margin: 5px 0;"><strong>Overall Crime Grade:</strong> 
+              <span style="color: ${this.getCrimeGradeColor(
+                crimeData.overallCrimeGrade
+              )}; font-weight: bold;">
+                ${crimeData.overallCrimeGrade}
+              </span>
+            </p>
+            <p style="margin: 5px 0;"><strong>Violent Crime:</strong> ${
+              crimeData.violentCrimeGrade
+            }</p>
+            <p style="margin: 5px 0;"><strong>Property Crime:</strong> ${
+              crimeData.propertyCrimeGrade
+            }</p>
+            <p style="margin: 5px 0;"><strong>Other Crime:</strong> ${
+              crimeData.otherCrimeGrade
+            }</p>
+            <p style="margin: 5px 0;"><strong>Risk:</strong> ${
+              crimeData.risk
+            } (${crimeData.riskDetail})</p>
+          </div>
+        `
+          : `<p style="margin-top: 10px; color: #888;">No crime data available.</p>`;
+
         const chartConfig: ChartDataConfig = {
           title: `Median Income - ZIP ${zip} (${zipRanking})`,
           labels: years,
           datasets: [
             {
               label: 'Median Income',
-              data: incomeValues.map((val) => (val === null ? 0 : val)), // Prevents null from breaking the chart
+              data: incomeValues.map((val) => (val === null ? 0 : val)),
               borderColor: '#007bff',
               backgroundColor: 'rgba(0, 123, 255, 0.2)',
             },
           ],
           position: this.map.latLngToContainerPoint(event.latlng),
+          extraHTML: crimeInfoHTML,
         };
 
         showChartPopup(chartConfig);
@@ -179,41 +184,86 @@ export class MapComponent implements OnInit, AfterViewInit {
     );
   }
 
-  private getZipRanking(medianIncome: number | null): string {
-    if (medianIncome === null || medianIncome === undefined) return 'Unknown';
-    if (medianIncome >= 120000) return 'S';
-    if (medianIncome >= 90000) return 'A';
-    if (medianIncome >= 60000) return 'B';
-    if (medianIncome >= 30000) return 'C';
-    return 'D';
+  private getZipRanking(medianIncome: number | null, zip: string): string {
+    if (medianIncome === null) return 'N/A';
+
+    const crimeData = this.crimeDataCache[zip] || null;
+    let crimeScore = 0;
+
+    if (crimeData) {
+      const crimeGradeToScore: Record<string, number> = {
+        'A+': 10,
+        A: 9,
+        'A-': 8,
+        'B+': 7,
+        B: 6,
+        'B-': 5,
+        'C+': 4,
+        C: 3,
+        'C-': 2,
+        'D+': 1,
+        D: 0,
+        'D-': -1,
+        F: -2,
+      };
+
+      const grade =
+        crimeData.overallCrimeGrade as keyof typeof crimeGradeToScore;
+      crimeScore = crimeGradeToScore[grade] ?? 0;
+    }
+
+    const weightedScore = medianIncome / 10000 + crimeScore;
+
+    return weightedScore > 20
+      ? 'S'
+      : weightedScore > 10
+      ? 'A'
+      : weightedScore > 5
+      ? 'B'
+      : weightedScore > 0
+      ? 'C'
+      : 'D';
   }
 
   private getZipRankingColor(ranking: string): string {
-    switch (ranking) {
-      case 'S':
-        return '#00441b'; // Dark Green
-      case 'A':
-        return '#238b45'; // Green
-      case 'B':
-        return '#66c2a4'; // Light Green
-      case 'C':
-        return '#feb24c'; // Orange
-      case 'D':
-        return '#e31a1c'; // Red
-      default:
-        return '#808080'; // Gray for unknown
-    }
+    return ranking === 'S'
+      ? '#00441b'
+      : ranking === 'A'
+      ? '#238b45'
+      : ranking === 'B'
+      ? '#66c2a4'
+      : ranking === 'C'
+      ? '#feb24c'
+      : ranking === 'D'
+      ? '#e31a1c'
+      : '#808080';
+  }
+
+  private getCrimeGradeColor(grade: string): string {
+    const gradeColors: Record<string, string> = {
+      'A+': '#2ca02c',
+      A: '#32a852',
+      'A-': '#47b25e',
+      'B+': '#86c232',
+      B: '#b6d432',
+      'B-': '#e1e632',
+      'C+': '#e8a232',
+      C: '#eb7d32',
+      'C-': '#eb4d32',
+      'D+': '#eb3232',
+      D: '#d62828',
+      'D-': '#b22222',
+      F: '#8b0000',
+    };
+    return gradeColors[grade] || '#555'; // Default to gray if undefined
   }
 
   filterZipByRanking(event: any) {
     const selectedRank = event.target.value;
-
-    this.zipBoundaryLayer.clearLayers(); // Clear all layers
-
+    this.zipBoundaryLayer.clearLayers();
     this.zipLayers.forEach(({ layer, rank }) => {
-      if (selectedRank === '' || rank === selectedRank) {
-        this.zipBoundaryLayer.addLayer(layer); // Add only the selected rank layers
-      }
+      if (!selectedRank || rank === selectedRank)
+        this.zipBoundaryLayer.addLayer(layer);
     });
   }
 }
