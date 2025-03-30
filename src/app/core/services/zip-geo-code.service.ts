@@ -1,15 +1,21 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { catchError, Observable, switchMap, of } from 'rxjs';
+import { environment } from '../../environment';
 
 @Injectable({
   providedIn: 'root',
 })
 export class ZipGeoCodeService {
+  private geoCodeApiUrl = `${environment.apiUrl}/geo-zipcode`;
+  private incomeApiUrl = `${environment.apiUrl}/median-income`;
+  private crimeApiUrl = `${environment.apiUrl}/crime`;
+
+  /*
   private geoCodeApiUrl = 'http://localhost:8080/geo-zipcode';
   private incomeApiUrl = 'http://localhost:8080/median-income';
   private crimeApiUrl = 'http://localhost:8080/crime';
-
+  */
   constructor(private http: HttpClient) {}
 
   //#region zipCode
