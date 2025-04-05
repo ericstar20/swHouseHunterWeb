@@ -15,9 +15,14 @@ export class MapComponent implements OnInit, AfterViewInit {
   private map!: L.Map;
   private zipBoundaryLayer = L.layerGroup();
   private popupDiv!: HTMLDivElement;
-  private zipLayers: { layer: L.Layer; rank: string }[] = [];
+  private zipLayers: {
+    layer: L.Layer;
+    rank: string;
+    zip: string;
+  }[] = [];
   private incomeDataCache: { [zip: string]: number } = {};
   private crimeDataCache: { [zip: string]: any } = {};
+  availableZipCodes: string[] = []; // For dropdown
 
   constructor(private zipGeoCodeService: ZipGeoCodeService) {}
 
@@ -79,7 +84,11 @@ export class MapComponent implements OnInit, AfterViewInit {
       (response) => {
         if (!response?.features?.length) return;
 
+        this.availableZipCodes = response.features.map(
+          (f: any) => f.properties?.zip || f.properties?.ZCTA5CE10
+        );
         this.zipBoundaryLayer.clearLayers();
+
         response.features.forEach((zipData: any) => {
           const zip = zipData.properties.zip;
           const latestIncome = this.incomeDataCache[zip] ?? null;
@@ -94,11 +103,15 @@ export class MapComponent implements OnInit, AfterViewInit {
               fillOpacity: 0.6,
             },
           })
-            .bindPopup(`ZIP: ${zip} - Rank: ${zipRanking}`)
+            .bindPopup(`ZIP: ${zip}<br>Rank: ${zipRanking}`)
             .on('click', (e: any) => this.onZipClick(e, zipData.properties));
 
           zipLayer.addTo(this.zipBoundaryLayer);
-          this.zipLayers.push({ layer: zipLayer, rank: zipRanking });
+          this.zipLayers.push({
+            layer: zipLayer,
+            rank: zipRanking,
+            zip: zip,
+          });
         });
       },
       (error) => console.error('❌ Error fetching ZIP boundaries:', error)
@@ -264,6 +277,16 @@ export class MapComponent implements OnInit, AfterViewInit {
     this.zipLayers.forEach(({ layer, rank }) => {
       if (!selectedRank || rank === selectedRank)
         this.zipBoundaryLayer.addLayer(layer);
+    });
+  }
+
+  filterZipByZipCode(event: Event) {
+    const inputZip = (event.target as HTMLInputElement).value;
+    if (!inputZip || !this.zipBoundaryLayer) return;
+
+    this.zipBoundaryLayer.clearLayers();
+    this.zipLayers.forEach(({ layer, zip }) => {
+      if (!inputZip || zip === inputZip) this.zipBoundaryLayer.addLayer(layer);
     });
   }
 }
