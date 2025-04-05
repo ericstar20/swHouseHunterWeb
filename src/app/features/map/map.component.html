@@ -8,6 +8,13 @@
         <option value="C">C - Low</option>
         <option value="D">D - Very Low</option>
     </select>
+    <!-- ZIP Autocomplete Filter -->
+    <label for="zip-search">Filter by ZIP code:</label>
+    <input type="text" id="zip-search" list="zip-list" (input)="filterZipByZipCode($event)"
+        placeholder=" Enter ZIP code" />
+    <datalist id="zip-list">
+        <option *ngFor="let zip of availableZipCodes" [value]="zip"></option>
+    </datalist>
 </div>
 
 <div class="map-container">
